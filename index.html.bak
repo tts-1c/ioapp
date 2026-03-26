@@ -22,6 +22,7 @@
             color: #000;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
+            overflow-x: hidden; /* Запрет горизонтальной прокрутки всей страницы */
         }
 
         header {
@@ -36,9 +37,6 @@
         }
 
         header h1 { font-size: 34px; margin: 0; font-weight: 700; letter-spacing: -1px; }
-        
-        /* Заголовок внутри списка — теперь большой и жирный */
-        .title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
         .inner-title { font-size: 30px; font-weight: 700; letter-spacing: -0.5px; margin: 0; flex: 1; }
 
         .container { padding: 16px; }
@@ -91,6 +89,7 @@
             background-color: var(--ios-red);
             border-bottom: 0.5px solid var(--ios-separator);
             overflow: hidden;
+            touch-action: pan-y; /* Разрешаем только вертикальный скролл */
         }
 
         .row-wrapper:last-child { border-bottom: none; }
@@ -104,7 +103,7 @@
             position: relative;
             z-index: 2;
             transition: transform 0.3s ease-out;
-			touch-action: pan-y;
+            touch-action: pan-y;
         }
 
         .swipe-actions {
@@ -150,9 +149,7 @@
 <div id="view-items" class="hidden">
     <header>
         <button class="btn-back" onclick="showMain()">‹ Назад</button>
-        <div class="title-row">
-            <h1 id="current-list-title" class="inner-title"></h1>
-        </div>
+        <h1 id="current-list-title" class="inner-title"></h1>
     </header>
     <div class="container">
         <div class="input-row">
@@ -165,7 +162,7 @@
 </div>
 
 <script>
-    let db, currentListId = null, startX = 0, activeRow = null;
+    let db, currentListId = null, startX = 0, startY = 0, activeRow = null, isSwiping = false;
 
     const request = indexedDB.open("ShoppingDB", 3);
     request.onupgradeneeded = (e) => {
@@ -177,39 +174,44 @@
 
     function haptic() { if (navigator.vibrate) navigator.vibrate(15); }
 
-	function tStart(e) {
-		startX = e.touches[0].clientX; // Берем первую точку касания
-		if (activeRow && activeRow !== e.currentTarget) closeSwipe();
-	}
+    // Улучшенная логика свайпа с блокировкой страницы
+    function tStart(e) {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        isSwiping = false;
+        if (activeRow && activeRow !== e.currentTarget) closeSwipe();
+    }
 
-	function tMove(e) {
-		let diff = startX - e.touches[0].clientX;
-		
-		// Если свайп идет влево (diff > 0)
-		if (diff > 5) { 
-			// Блокируем стандартное поведение браузера (скролл всей страницы влево/вправо)
-			if (e.cancelable) e.preventDefault(); 
-			
-			if (diff < 200) {
-				e.currentTarget.style.transform = `translateX(-${diff}px)`;
-				e.currentTarget.style.transition = 'none';
-			}
-		}
-	}
+    function tMove(e) {
+        let diffX = startX - e.touches[0].clientX;
+        let diffY = Math.abs(startY - e.touches[0].clientY);
 
-	function tEnd(e) {
-		let diff = startX - e.changedTouches[0].clientX;
-		let row = e.currentTarget;
-		row.style.transition = 'transform 0.3s ease-out';
-		
-		if (diff > 80) {
-			row.style.transform = `translateX(-170px)`;
-			activeRow = row;
-		} else {
-			row.style.transform = `translateX(0)`;
-			activeRow = null;
-		}
-	}
+        // Если движение больше горизонтальное, чем вертикальное
+        if (diffX > 5 && diffX > diffY) {
+            isSwiping = true;
+            if (e.cancelable) e.preventDefault(); // Блокируем сдвиг всей страницы
+            e.stopPropagation();
+            
+            let move = Math.min(diffX, 200);
+            e.currentTarget.style.transform = `translateX(-${move}px)`;
+            e.currentTarget.style.transition = 'none';
+        }
+    }
+
+    function tEnd(e) {
+        if (!isSwiping) return;
+        let diff = startX - e.changedTouches[0].clientX;
+        let row = e.currentTarget;
+        row.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        
+        if (diff > 80) {
+            row.style.transform = `translateX(-170px)`;
+            activeRow = row;
+        } else {
+            row.style.transform = `translateX(0)`;
+            activeRow = null;
+        }
+    }
 
     function closeSwipe() {
         if (activeRow) {
@@ -263,6 +265,7 @@
         };
     }
 
+    // Enter handlers
     document.getElementById('new-list-name').onkeypress = (e) => { if (e.key === 'Enter') newList(); };
     document.getElementById('new-item-name').onkeypress = (e) => { if (e.key === 'Enter') addItem(); };
     document.getElementById('new-item-qty').onkeypress = (e) => { if (e.key === 'Enter') addItem(); };
@@ -334,7 +337,7 @@
         document.getElementById('view-main').classList.add('hidden');
         document.getElementById('view-items').classList.remove('hidden');
         renderItems();
-        setTimeout(() => document.getElementById('new-item-name').focus(), 350);
+        setTimeout(() => document.getElementById('new-item-name').focus(), 400);
     }
 
     function showMain() {
