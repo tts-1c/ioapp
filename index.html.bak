@@ -41,44 +41,44 @@
 
         .container { padding: 16px; }
 
-        /* Поля ввода и кнопка (Исправленная верстка) */
         .input-row {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             margin-bottom: 24px;
             width: 100%;
-            box-sizing: border-box;
         }
 
         input {
             background: #E3E3E8;
             border: none;
-            padding: 12px;
+            padding: 12px 16px;
             border-radius: 12px;
             font-size: 17px;
             outline: none;
-            min-width: 0; /* Позволяет flex-элементам сжиматься */
+            min-width: 0;
         }
 
         #new-list-name, #new-item-name { flex: 1; }
         #new-item-qty { width: 65px; flex: 0 0 auto; text-align: center; }
 
         .btn-circle {
-            width: 34px; height: 34px;
+            width: 32px; height: 32px;
             background-color: var(--ios-blue);
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             border: none; color: white; font-size: 24px; font-weight: 300;
-            flex: 0 0 auto; /* Запрещаем сжатие кнопки */
+            flex-shrink: 0;
         }
 
         .btn-back {
-            color: var(--ios-blue); font-size: 17px; background: none; border: none;
-            display: flex; align-items: center; padding: 0; margin-bottom: 10px;
+            color: var(--ios-blue);
+            font-size: 17px;
+            background: none; border: none;
+            display: flex; align-items: center; padding: 0;
+            margin-bottom: 10px;
         }
 
-        /* Таблица со свайпами */
         .table-view {
             background: var(--ios-card);
             border-radius: 12px;
@@ -110,11 +110,13 @@
         .swipe-actions {
             position: absolute;
             right: 0; top: 0; bottom: 0;
-            display: flex; z-index: 1;
+            display: flex;
+            z-index: 1;
         }
 
         .action-btn {
-            width: 85px; display: flex; align-items: center; justify-content: center;
+            width: 85px;
+            display: flex; align-items: center; justify-content: center;
             color: white; font-weight: 600; font-size: 15px; border: none;
         }
         .action-edit { background-color: var(--ios-blue); }
@@ -122,6 +124,7 @@
 
         .list-name { font-weight: 700; font-size: 20px; letter-spacing: -0.5px; }
         .list-date { font-size: 13px; color: #8E8E93; margin-top: 2px; }
+        
         .item-text { font-size: 17px; flex: 1; text-align: left; }
         .item-qty { font-size: 17px; color: #8E8E93; margin-left: 10px; }
 
@@ -160,7 +163,7 @@
 </div>
 
 <script>
-    let db, currentListId = null, startX = 0, startY = 0, currentXOffset = 0, activeRow = null, isHorizontalSwipe = false;
+    let db, currentListId = null, startX = 0, startY = 0, activeRow = null, isSwiping = false;
 
     const request = indexedDB.open("ShoppingDB", 3);
     request.onupgradeneeded = (e) => {
@@ -172,37 +175,47 @@
 
     function haptic() { if (navigator.vibrate) navigator.vibrate(15); }
 
-    // Логика свайпа
+    // ЛОГИКА СВАЙПА (Версия 2.0 - Самая стабильная)
     function tStart(e) {
-        startX = e.touches.clientX;
-        startY = e.touches.clientY;
-        isHorizontalSwipe = false;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        isSwiping = false;
         if (activeRow && activeRow !== e.currentTarget) closeSwipe();
-        const style = e.currentTarget.style.transform;
-        currentXOffset = style && style.includes('translateX') ? parseInt(style.replace(/[^\d-]/g, '')) : 0;
     }
 
     function tMove(e) {
-        let diffX = startX - e.touches.clientX;
-        let diffY = Math.abs(startY - e.touches.clientY);
-        if (!isHorizontalSwipe && Math.abs(diffX) > 10 && Math.abs(diffX) > diffY) isHorizontalSwipe = true;
-        if (isHorizontalSwipe) {
+        let diffX = startX - e.touches[0].clientX;
+        let diffY = Math.abs(startY - e.touches[0].clientY);
+
+        // Если тянем горизонтально
+        if (Math.abs(diffX) > 10 && Math.abs(diffX) > diffY) {
+            isSwiping = true;
             if (e.cancelable) e.preventDefault();
-            let newX = currentXOffset - diffX;
-            if (newX > 0) newX /= 4; 
-            if (newX < -200) newX = -200;
+            
+            // Расчет движения
+            let move = diffX;
+            // Если тянем влево открытую строку или вправо закрытую - добавляем логику
+            if (activeRow === e.currentTarget) move += 170; 
+
+            if (move > 0) { // Свайп влево
+                let translate = Math.min(move, 200);
+                e.currentTarget.style.transform = `translateX(-${translate}px)`;
+            } else { // Свайп вправо
+                let translate = Math.max(move, -50);
+                e.currentTarget.style.transform = `translateX(${-translate}px)`;
+            }
             e.currentTarget.style.transition = 'none';
-            e.currentTarget.style.transform = `translateX(${newX}px)`;
         }
     }
 
     function tEnd(e) {
-        if (!isHorizontalSwipe) return;
+        if (!isSwiping) return;
         let row = e.currentTarget;
-        let diffX = startX - e.changedTouches.clientX;
-        let finalX = currentXOffset - diffX;
+        let diffX = startX - e.changedTouches[0].clientX;
         row.style.transition = 'transform 0.3s ease-out';
-        if (finalX < -70) {
+        
+        // Если суммарно сдвинуто влево больше чем на 80
+        if (diffX > 80 || (activeRow === row && diffX > -80)) {
             row.style.transform = `translateX(-170px)`;
             activeRow = row;
         } else {
@@ -212,10 +225,13 @@
     }
 
     function closeSwipe() {
-        if (activeRow) { activeRow.style.transform = `translateX(0)`; activeRow = null; }
+        if (activeRow) {
+            activeRow.style.transform = `translateX(0)`;
+            activeRow = null;
+        }
     }
 
-    // Рендер и функции БД
+    // --- БАЗА ДАННЫХ И РЕНДЕР ---
     function renderLists() {
         const container = document.getElementById('lists-container');
         container.innerHTML = '';
@@ -228,7 +244,7 @@
                         <button class="action-btn action-edit" onclick="editList(${list.id},'${list.name}')">Правка</button>
                         <button class="action-btn action-delete" onclick="deleteList(${list.id})">Удалить</button>
                     </div>
-                    <div class="table-row" ontouchstart="tStart(event)" ontouchmove="tMove(event)" ontouchend="tEnd(event)" onclick="if(!activeRow) showItems(${list.id}, '${list.name}')">
+                    <div class="table-row" ontouchstart="tStart(event)" ontouchmove="tMove(event)" ontouchend="tEnd(event)" onclick="if(!isSwiping && !activeRow) showItems(${list.id}, '${list.name}')">
                         <div><span class="list-name">${list.name}</span><div class="list-date">${list.date}</div></div>
                     </div>`;
                 container.appendChild(div);
@@ -249,7 +265,7 @@
                         <button class="action-btn action-edit" onclick="editItem(${item.id},'${item.name}','${item.qty||''}')">Правка</button>
                         <button class="action-btn action-delete" onclick="deleteItem(${item.id})">Удалить</button>
                     </div>
-                    <div class="table-row ${item.bought ? 'bought' : ''}" ontouchstart="tStart(event)" ontouchmove="tMove(event)" ontouchend="tEnd(event)" onclick="if(!activeRow) toggleItem(${item.id}, ${item.bought})">
+                    <div class="table-row ${item.bought ? 'bought' : ''}" ontouchstart="tStart(event)" ontouchmove="tMove(event)" ontouchend="tEnd(event)" onclick="if(!isSwiping && !activeRow) toggleItem(${item.id}, ${item.bought})">
                         <span class="item-text">${item.name}</span>
                         <span class="item-qty">${item.qty || ''}</span>
                     </div>`;
