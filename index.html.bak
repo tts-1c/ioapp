@@ -89,7 +89,6 @@
             background-color: var(--ios-red);
             border-bottom: 0.5px solid var(--ios-separator);
             overflow: hidden;
-            touch-action: pan-y;
         }
 
         .row-wrapper:last-child { border-bottom: none; }
@@ -162,8 +161,8 @@
 </div>
 
 <script>
-    let db, currentListId = null, startX = 0, startY = 0, activeRow = null, isSwiping = false;
-    let initialOffset = 0; // Состояние смещения в начале касания
+    let db, currentListId = null;
+    let startX = 0, startY = 0, currentXOffset = 0, activeRow = null, isHorizontalSwipe = false;
 
     const request = indexedDB.open("ShoppingDB", 3);
     request.onupgradeneeded = (e) => {
@@ -175,57 +174,61 @@
 
     function haptic() { if (navigator.vibrate) navigator.vibrate(15); }
 
+    // ЛОГИКА СВАЙПА
     function tStart(e) {
-        startX = e.touches.clientX;
-        startY = e.touches.clientY;
-        isSwiping = false;
-        
-        // Получаем текущее смещение (открыто меню или нет)
-        const style = window.getComputedStyle(e.currentTarget);
-        const matrix = new WebKitCSSMatrix(style.transform);
-        initialOffset = matrix.m41;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        isHorizontalSwipe = false;
 
+        // Если есть активная строка и это не текущая — закрываем её
         if (activeRow && activeRow !== e.currentTarget) closeSwipe();
+
+        // Узнаем текущий сдвиг из инлайнового стиля (или 0)
+        const matrix = e.currentTarget.style.transform;
+        if (matrix && matrix.includes('translateX')) {
+            currentXOffset = parseInt(matrix.replace(/[^\d-]/g, ''));
+        } else {
+            currentXOffset = 0;
+        }
     }
 
     function tMove(e) {
-        let currentX = e.touches.clientX;
-        let diffX = startX - currentX;
-        let diffY = Math.abs(startY - e.touches.clientY);
+        let diffX = startX - e.touches[0].clientX;
+        let diffY = Math.abs(startY - e.touches[0].clientY);
 
-        // Блокируем скролл страницы только если жест явно горизонтальный
-        if (Math.abs(diffX) > 5 && Math.abs(diffX) > diffY) {
-            isSwiping = true;
+        // Определяем направление один раз за жест
+        if (!isHorizontalSwipe && Math.abs(diffX) > 10 && Math.abs(diffX) > diffY) {
+            isHorizontalSwipe = true;
+        }
+
+        if (isHorizontalSwipe) {
             if (e.cancelable) e.preventDefault();
-            e.stopPropagation();
+            
+            let newX = currentXOffset - diffX;
+            
+            // Ограничения: не более 0 вправо (резиновый эффект), не более 200 влево
+            if (newX > 0) newX = newX / 4; 
+            if (newX < -200) newX = -200;
 
-            let targetMove = initialOffset - diffX;
-
-            // Ограничиваем движение: не даем уйти вправо больше 0
-            if (targetMove > 0) targetMove = targetMove / 3; // "Резиновый" эффект
-            // Ограничиваем свайп влево (макс 200px)
-            if (targetMove < -200) targetMove = -200;
-
-            e.currentTarget.style.transform = `translateX(${targetMove}px)`;
             e.currentTarget.style.transition = 'none';
+            e.currentTarget.style.transform = `translateX(${newX}px)`;
         }
     }
 
     function tEnd(e) {
-        if (!isSwiping) return;
-        let row = e.currentTarget;
-        const style = window.getComputedStyle(row);
-        const matrix = new WebKitCSSMatrix(style.transform);
-        let finalOffset = matrix.m41;
-
-        row.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        if (!isHorizontalSwipe) return;
         
-        // Если свайпнули влево достаточно сильно (-80px)
-        if (finalOffset < -80) {
+        let row = e.currentTarget;
+        let diffX = startX - e.changedTouches[0].clientX;
+        let finalX = currentXOffset - diffX;
+
+        row.style.transition = 'transform 0.3s ease-out';
+
+        // Логика фиксации: если сдвинуто влево больше чем на 70px — открываем
+        if (finalX < -70) {
             row.style.transform = `translateX(-170px)`;
             activeRow = row;
         } else {
-            // Если свайпнули вправо или недостаточно влево — закрываем
             row.style.transform = `translateX(0)`;
             activeRow = null;
         }
@@ -238,8 +241,7 @@
         }
     }
 
-    // --- Логика рендеринга и БД (без изменений) ---
-
+    // --- РЕНДЕР И БД ---
     function renderLists() {
         const container = document.getElementById('lists-container');
         container.innerHTML = '';
@@ -253,7 +255,10 @@
                         <button class="action-btn action-delete" onclick="deleteList(${list.id})">Удалить</button>
                     </div>
                     <div class="table-row" ontouchstart="tStart(event)" ontouchmove="tMove(event)" ontouchend="tEnd(event)" onclick="if(!activeRow) showItems(${list.id}, '${list.name}')">
-                        <div><span class="list-name">${list.name}</span><div class="list-date">${list.date}</div></div>
+                        <div>
+                            <span class="list-name">${list.name}</span>
+                            <div class="list-date">${list.date}</div>
+                        </div>
                     </div>`;
                 container.appendChild(div);
             });
@@ -289,50 +294,48 @@
     function newList() {
         const input = document.getElementById('new-list-name');
         if (!input.value) return;
-        const transaction = db.transaction(["lists"], "readwrite");
-        transaction.objectStore("lists").add({ name: input.value, date: new Date().toLocaleDateString('ru-RU') });
-        transaction.oncomplete = () => { input.value = ''; renderLists(); haptic(); input.focus(); };
+        const t = db.transaction(["lists"], "readwrite");
+        t.objectStore("lists").add({ name: input.value, date: new Date().toLocaleDateString('ru-RU') });
+        t.oncomplete = () => { input.value = ''; renderLists(); haptic(); input.focus(); };
     }
 
     function addItem() {
-        const nameInput = document.getElementById('new-item-name');
-        const qtyInput = document.getElementById('new-item-qty');
-        if (!nameInput.value) return;
-        const transaction = db.transaction(["items"], "readwrite");
-        transaction.objectStore("items").add({ listId: currentListId, name: nameInput.value, qty: qtyInput.value, bought: false });
-        transaction.oncomplete = () => { nameInput.value = ''; qtyInput.value = ''; renderItems(); haptic(); nameInput.focus(); };
+        const ni = document.getElementById('new-item-name'), qi = document.getElementById('new-item-qty');
+        if (!ni.value) return;
+        const t = db.transaction(["items"], "readwrite");
+        t.objectStore("items").add({ listId: currentListId, name: ni.value, qty: qi.value, bought: false });
+        t.oncomplete = () => { ni.value = ''; qi.value = ''; renderItems(); haptic(); ni.focus(); };
     }
 
-    function toggleItem(id, status) {
+    function toggleItem(id, s) {
         haptic();
-        const store = db.transaction(["items"], "readwrite").objectStore("items");
-        store.get(id).onsuccess = (e) => {
-            const data = e.target.result;
-            data.bought = !status;
-            store.put(data).onsuccess = renderItems;
+        const os = db.transaction(["items"], "readwrite").objectStore("items");
+        os.get(id).onsuccess = (e) => {
+            const d = e.target.result; d.bought = !s;
+            os.put(d).onsuccess = renderItems;
         };
     }
 
     function editList(id, old) {
-        const name = prompt("Название:", old);
-        if (name) {
-            const store = db.transaction(["lists"], "readwrite").objectStore("lists");
-            store.get(id).onsuccess = (e) => {
-                let d = e.target.result; d.name = name;
-                store.put(d).onsuccess = renderLists;
+        const n = prompt("Название:", old);
+        if (n) {
+            const os = db.transaction(["lists"], "readwrite").objectStore("lists");
+            os.get(id).onsuccess = (e) => {
+                let d = e.target.result; d.name = n;
+                os.put(d).onsuccess = renderLists;
             };
         }
         closeSwipe();
     }
 
     function editItem(id, n, q) {
-        const name = prompt("Товар:", n);
-        if (name === null) return closeSwipe();
-        const qty = prompt("Кол-во:", q);
-        const store = db.transaction(["items"], "readwrite").objectStore("items");
-        store.get(id).onsuccess = (e) => {
-            let d = e.target.result; d.name = name; d.qty = qty;
-            store.put(d).onsuccess = renderItems;
+        const nn = prompt("Товар:", n);
+        if (nn === null) return closeSwipe();
+        const nq = prompt("Кол-во:", q);
+        const os = db.transaction(["items"], "readwrite").objectStore("items");
+        os.get(id).onsuccess = (e) => {
+            let d = e.target.result; d.name = nn; d.qty = nq;
+            os.put(d).onsuccess = renderItems;
         };
         closeSwipe();
     }

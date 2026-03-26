@@ -41,42 +41,44 @@
 
         .container { padding: 16px; }
 
+        /* Поля ввода и кнопка (Исправленная верстка) */
         .input-row {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             margin-bottom: 24px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         input {
             background: #E3E3E8;
             border: none;
-            padding: 12px 16px;
+            padding: 12px;
             border-radius: 12px;
             font-size: 17px;
             outline: none;
+            min-width: 0; /* Позволяет flex-элементам сжиматься */
         }
 
-        #new-list-name, #new-item-name { flex: 3; }
-        #new-item-qty { flex: 1; width: 60px; text-align: center; }
+        #new-list-name, #new-item-name { flex: 1; }
+        #new-item-qty { width: 65px; flex: 0 0 auto; text-align: center; }
 
         .btn-circle {
-            width: 32px; height: 32px;
+            width: 34px; height: 34px;
             background-color: var(--ios-blue);
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             border: none; color: white; font-size: 24px; font-weight: 300;
-            flex-shrink: 0;
+            flex: 0 0 auto; /* Запрещаем сжатие кнопки */
         }
 
         .btn-back {
-            color: var(--ios-blue);
-            font-size: 17px;
-            background: none; border: none;
-            display: flex; align-items: center; padding: 0;
-            margin-bottom: 10px;
+            color: var(--ios-blue); font-size: 17px; background: none; border: none;
+            display: flex; align-items: center; padding: 0; margin-bottom: 10px;
         }
 
+        /* Таблица со свайпами */
         .table-view {
             background: var(--ios-card);
             border-radius: 12px;
@@ -108,13 +110,11 @@
         .swipe-actions {
             position: absolute;
             right: 0; top: 0; bottom: 0;
-            display: flex;
-            z-index: 1;
+            display: flex; z-index: 1;
         }
 
         .action-btn {
-            width: 85px;
-            display: flex; align-items: center; justify-content: center;
+            width: 85px; display: flex; align-items: center; justify-content: center;
             color: white; font-weight: 600; font-size: 15px; border: none;
         }
         .action-edit { background-color: var(--ios-blue); }
@@ -122,7 +122,6 @@
 
         .list-name { font-weight: 700; font-size: 20px; letter-spacing: -0.5px; }
         .list-date { font-size: 13px; color: #8E8E93; margin-top: 2px; }
-        
         .item-text { font-size: 17px; flex: 1; text-align: left; }
         .item-qty { font-size: 17px; color: #8E8E93; margin-left: 10px; }
 
@@ -161,8 +160,7 @@
 </div>
 
 <script>
-    let db, currentListId = null;
-    let startX = 0, startY = 0, currentXOffset = 0, activeRow = null, isHorizontalSwipe = false;
+    let db, currentListId = null, startX = 0, startY = 0, currentXOffset = 0, activeRow = null, isHorizontalSwipe = false;
 
     const request = indexedDB.open("ShoppingDB", 3);
     request.onupgradeneeded = (e) => {
@@ -174,42 +172,25 @@
 
     function haptic() { if (navigator.vibrate) navigator.vibrate(15); }
 
-    // ЛОГИКА СВАЙПА
+    // Логика свайпа
     function tStart(e) {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
+        startX = e.touches.clientX;
+        startY = e.touches.clientY;
         isHorizontalSwipe = false;
-
-        // Если есть активная строка и это не текущая — закрываем её
         if (activeRow && activeRow !== e.currentTarget) closeSwipe();
-
-        // Узнаем текущий сдвиг из инлайнового стиля (или 0)
-        const matrix = e.currentTarget.style.transform;
-        if (matrix && matrix.includes('translateX')) {
-            currentXOffset = parseInt(matrix.replace(/[^\d-]/g, ''));
-        } else {
-            currentXOffset = 0;
-        }
+        const style = e.currentTarget.style.transform;
+        currentXOffset = style && style.includes('translateX') ? parseInt(style.replace(/[^\d-]/g, '')) : 0;
     }
 
     function tMove(e) {
-        let diffX = startX - e.touches[0].clientX;
-        let diffY = Math.abs(startY - e.touches[0].clientY);
-
-        // Определяем направление один раз за жест
-        if (!isHorizontalSwipe && Math.abs(diffX) > 10 && Math.abs(diffX) > diffY) {
-            isHorizontalSwipe = true;
-        }
-
+        let diffX = startX - e.touches.clientX;
+        let diffY = Math.abs(startY - e.touches.clientY);
+        if (!isHorizontalSwipe && Math.abs(diffX) > 10 && Math.abs(diffX) > diffY) isHorizontalSwipe = true;
         if (isHorizontalSwipe) {
             if (e.cancelable) e.preventDefault();
-            
             let newX = currentXOffset - diffX;
-            
-            // Ограничения: не более 0 вправо (резиновый эффект), не более 200 влево
-            if (newX > 0) newX = newX / 4; 
+            if (newX > 0) newX /= 4; 
             if (newX < -200) newX = -200;
-
             e.currentTarget.style.transition = 'none';
             e.currentTarget.style.transform = `translateX(${newX}px)`;
         }
@@ -217,14 +198,10 @@
 
     function tEnd(e) {
         if (!isHorizontalSwipe) return;
-        
         let row = e.currentTarget;
-        let diffX = startX - e.changedTouches[0].clientX;
+        let diffX = startX - e.changedTouches.clientX;
         let finalX = currentXOffset - diffX;
-
         row.style.transition = 'transform 0.3s ease-out';
-
-        // Логика фиксации: если сдвинуто влево больше чем на 70px — открываем
         if (finalX < -70) {
             row.style.transform = `translateX(-170px)`;
             activeRow = row;
@@ -235,13 +212,10 @@
     }
 
     function closeSwipe() {
-        if (activeRow) {
-            activeRow.style.transform = `translateX(0)`;
-            activeRow = null;
-        }
+        if (activeRow) { activeRow.style.transform = `translateX(0)`; activeRow = null; }
     }
 
-    // --- РЕНДЕР И БД ---
+    // Рендер и функции БД
     function renderLists() {
         const container = document.getElementById('lists-container');
         container.innerHTML = '';
@@ -255,10 +229,7 @@
                         <button class="action-btn action-delete" onclick="deleteList(${list.id})">Удалить</button>
                     </div>
                     <div class="table-row" ontouchstart="tStart(event)" ontouchmove="tMove(event)" ontouchend="tEnd(event)" onclick="if(!activeRow) showItems(${list.id}, '${list.name}')">
-                        <div>
-                            <span class="list-name">${list.name}</span>
-                            <div class="list-date">${list.date}</div>
-                        </div>
+                        <div><span class="list-name">${list.name}</span><div class="list-date">${list.date}</div></div>
                     </div>`;
                 container.appendChild(div);
             });
@@ -292,78 +263,49 @@
     document.getElementById('new-item-qty').onkeypress = (e) => { if (e.key === 'Enter') addItem(); };
 
     function newList() {
-        const input = document.getElementById('new-list-name');
-        if (!input.value) return;
+        const i = document.getElementById('new-list-name'); if (!i.value) return;
         const t = db.transaction(["lists"], "readwrite");
-        t.objectStore("lists").add({ name: input.value, date: new Date().toLocaleDateString('ru-RU') });
-        t.oncomplete = () => { input.value = ''; renderLists(); haptic(); input.focus(); };
+        t.objectStore("lists").add({ name: i.value, date: new Date().toLocaleDateString('ru-RU') });
+        t.oncomplete = () => { i.value = ''; renderLists(); haptic(); i.focus(); };
     }
 
     function addItem() {
-        const ni = document.getElementById('new-item-name'), qi = document.getElementById('new-item-qty');
-        if (!ni.value) return;
+        const ni = document.getElementById('new-item-name'), qi = document.getElementById('new-item-qty'); if (!ni.value) return;
         const t = db.transaction(["items"], "readwrite");
         t.objectStore("items").add({ listId: currentListId, name: ni.value, qty: qi.value, bought: false });
         t.oncomplete = () => { ni.value = ''; qi.value = ''; renderItems(); haptic(); ni.focus(); };
     }
 
     function toggleItem(id, s) {
-        haptic();
-        const os = db.transaction(["items"], "readwrite").objectStore("items");
-        os.get(id).onsuccess = (e) => {
-            const d = e.target.result; d.bought = !s;
-            os.put(d).onsuccess = renderItems;
-        };
+        haptic(); const os = db.transaction(["items"], "readwrite").objectStore("items");
+        os.get(id).onsuccess = (e) => { const d = e.target.result; d.bought = !s; os.put(d).onsuccess = renderItems; };
     }
 
     function editList(id, old) {
-        const n = prompt("Название:", old);
-        if (n) {
+        const n = prompt("Название:", old); if (n) {
             const os = db.transaction(["lists"], "readwrite").objectStore("lists");
-            os.get(id).onsuccess = (e) => {
-                let d = e.target.result; d.name = n;
-                os.put(d).onsuccess = renderLists;
-            };
+            os.get(id).onsuccess = (e) => { let d = e.target.result; d.name = n; os.put(d).onsuccess = renderLists; };
         }
         closeSwipe();
     }
 
     function editItem(id, n, q) {
-        const nn = prompt("Товар:", n);
-        if (nn === null) return closeSwipe();
-        const nq = prompt("Кол-во:", q);
-        const os = db.transaction(["items"], "readwrite").objectStore("items");
-        os.get(id).onsuccess = (e) => {
-            let d = e.target.result; d.name = nn; d.qty = nq;
-            os.put(d).onsuccess = renderItems;
-        };
+        const nn = prompt("Товар:", n); if (nn === null) return closeSwipe();
+        const nq = prompt("Кол-во:", q); const os = db.transaction(["items"], "readwrite").objectStore("items");
+        os.get(id).onsuccess = (e) => { let d = e.target.result; d.name = nn; d.qty = nq; os.put(d).onsuccess = renderItems; };
         closeSwipe();
     }
 
-    function deleteList(id) {
-        db.transaction(["lists", "items"], "readwrite").objectStore("lists").delete(id);
-        renderLists(); activeRow = null; haptic();
-    }
-
-    function deleteItem(id) {
-        db.transaction(["items"], "readwrite").objectStore("items").delete(id).onsuccess = renderItems;
-        activeRow = null; haptic();
-    }
+    function deleteList(id) { db.transaction(["lists", "items"], "readwrite").objectStore("lists").delete(id); renderLists(); activeRow = null; haptic(); }
+    function deleteItem(id) { db.transaction(["items"], "readwrite").objectStore("items").delete(id).onsuccess = renderItems; activeRow = null; haptic(); }
 
     function showItems(id, name) {
-        currentListId = id;
-        document.getElementById('current-list-title').innerText = name;
-        document.getElementById('view-main').classList.add('hidden');
-        document.getElementById('view-items').classList.remove('hidden');
-        renderItems();
-        setTimeout(() => document.getElementById('new-item-name').focus(), 400);
+        currentListId = id; document.getElementById('current-list-title').innerText = name;
+        document.getElementById('view-main').classList.add('hidden'); document.getElementById('view-items').classList.remove('hidden');
+        renderItems(); setTimeout(() => document.getElementById('new-item-name').focus(), 400);
     }
 
-    function showMain() {
-        document.getElementById('view-main').classList.remove('hidden');
-        document.getElementById('view-items').classList.add('hidden');
-        renderLists();
-    }
+    function showMain() { document.getElementById('view-main').classList.remove('hidden'); document.getElementById('view-items').classList.add('hidden'); renderLists(); }
 </script>
 </body>
 </html>
