@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    
+    <!-- Иконка для рабочего стола Apple -->
+    <link rel="apple-touch-icon" href="icon.png">
+    <!-- Скрыть интерфейс браузера (строку адреса) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- Цвет статусной строки (часы, заряд) -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мое Офлайн Приложение</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body { font-family: sans-serif; text-align: center; padding-top: 50px; }
+        .status { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Привет! Я работаю без интернета.</h1>
+    <p id="network-status">Проверка сети...</p>
+
+    <script>
+        // Регистрация Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log("Service Worker зарегистрирован!"));
+        }
+
+        // Простая проверка сети
+        function updateStatus() {
+            const el = document.getElementById('network-status');
+            el.innerText = navigator.onLine ? "Вы онлайн" : "Вы офлайн (но я работаю!)";
+            el.style.color = navigator.onLine ? "green" : "orange";
+        }
+        window.addEventListener('online', updateStatus);
+        window.addEventListener('offline', updateStatus);
+        updateStatus();
+    </script>
+</body>
+</html>

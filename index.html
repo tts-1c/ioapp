@@ -2,42 +2,169 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    
-    <!-- Иконка для рабочего стола Apple -->
-    <link rel="apple-touch-icon" href="icon.png">
-    <!-- Скрыть интерфейс браузера (строку адреса) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <!-- Цвет статусной строки (часы, заряд) -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мое Офлайн Приложение</title>
-    <link rel="manifest" href="manifest.json">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Списки покупок</title>
+    <link rel="apple-touch-icon" href="icon.png">
     <style>
-        body { font-family: sans-serif; text-align: center; padding-top: 50px; }
-        .status { color: green; }
+        :root { --ios-blue: #007AFF; --ios-gray: #F2F2F7; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; background: var(--ios-gray); }
+        header { background: #fff; padding: 40px 20px 10px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center; }
+        .container { padding: 10px; }
+        
+        /* Таблицы / Списки */
+        .card { background: #fff; border-radius: 10px; overflow: hidden; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .row { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .row:last-child { border-bottom: none; }
+        .row:active { background: #e5e5ea; }
+        
+        /* Индикация "в корзине" */
+        .bought { background-color: #d1ffd1 !important; text-decoration: line-through; color: #888; }
+        
+        /* Кнопки и формы */
+        .btn { color: var(--ios-blue); font-size: 17px; background: none; border: none; cursor: pointer; }
+        .btn-del { color: #ff3b30; font-size: 14px; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
+        
+        .hidden { display: none; }
+        .date-text { font-size: 12px; color: #8e8e93; }
     </style>
 </head>
 <body>
-    <h1>Привет! Я работаю без интернета.</h1>
-    <p id="network-status">Проверка сети...</p>
 
-    <script>
-        // Регистрация Service Worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(() => console.log("Service Worker зарегистрирован!"));
-        }
+<div id="view-main">
+    <header>
+        <h1>Списки</h1>
+        <button class="btn" onclick="newList()">+</button>
+    </header>
+    <div class="container">
+        <div class="input-group">
+            <input type="text" id="new-list-name" placeholder="Название (напр. Продукты)">
+        </div>
+        <div id="lists-container" class="card"></div>
+    </div>
+</div>
 
-        // Простая проверка сети
-        function updateStatus() {
-            const el = document.getElementById('network-status');
-            el.innerText = navigator.onLine ? "Вы онлайн" : "Вы офлайн (но я работаю!)";
-            el.style.color = navigator.onLine ? "green" : "orange";
-        }
-        window.addEventListener('online', updateStatus);
-        window.addEventListener('offline', updateStatus);
-        updateStatus();
-    </script>
+<div id="view-items" class="hidden">
+    <header>
+        <button class="btn" onclick="showMain()">< Назад</button>
+        <h1 id="current-list-title">Товары</h1>
+        <span></span>
+    </header>
+    <div class="container">
+        <div class="input-group">
+            <input type="text" id="new-item-name" placeholder="Что купить?">
+            <button class="btn" onclick="addItem()">Добавить</button>
+        </div>
+        <div id="items-container" class="card"></div>
+    </div>
+</div>
+
+<script>
+    let db;
+    let currentListId = null;
+
+    // 1. Инициализация БД
+    const request = indexedDB.open("ShoppingDB", 1);
+    request.onupgradeneeded = (e) => {
+        db = e.target.result;
+        db.createObjectStore("lists", { keyPath: "id", autoIncrement: true });
+        db.createObjectStore("items", { keyPath: "id", autoIncrement: true }).createIndex("listId", "listId");
+    };
+    request.onsuccess = (e) => { db = e.target.result; renderLists(); };
+
+    // 2. Работа со списками
+    function newList() {
+        const name = document.getElementById('new-list-name').value;
+        if (!name) return;
+        const transaction = db.transaction(["lists"], "readwrite");
+        transaction.objectStore("lists").add({ name: name, date: new Date().toLocaleDateString() });
+        transaction.oncomplete = () => {
+            document.getElementById('new-list-name').value = '';
+            renderLists();
+        };
+    }
+
+    function renderLists() {
+        const container = document.getElementById('lists-container');
+        container.innerHTML = '';
+        db.transaction("lists").objectStore("lists").getAll().onsuccess = (e) => {
+            e.target.result.forEach(list => {
+                container.innerHTML += `
+                    <div class="row" onclick="showItems(${list.id}, '${list.name}')">
+                        <div>
+                            <div>${list.name}</div>
+                            <div class="date-text">${list.date}</div>
+                        </div>
+                        <button class="btn-del" onclick="deleteList(event, ${list.id})">Удалить</button>
+                    </div>`;
+            });
+        };
+    }
+
+    function deleteList(e, id) {
+        e.stopPropagation();
+        db.transaction(["lists"], "readwrite").objectStore("lists").delete(id);
+        renderLists();
+    }
+
+    // 3. Работа с товарами внутри списка
+    function showItems(id, name) {
+        currentListId = id;
+        document.getElementById('current-list-title').innerText = name;
+        document.getElementById('view-main').classList.add('hidden');
+        document.getElementById('view-items').classList.remove('hidden');
+        renderItems();
+    }
+
+    function showMain() {
+        document.getElementById('view-main').classList.remove('hidden');
+        document.getElementById('view-items').classList.add('hidden');
+        renderLists();
+    }
+
+    function addItem() {
+        const name = document.getElementById('new-item-name').value;
+        if (!name) return;
+        const transaction = db.transaction(["items"], "readwrite");
+        transaction.objectStore("items").add({ listId: currentListId, name: name, bought: false });
+        transaction.oncomplete = () => {
+            document.getElementById('new-item-name').value = '';
+            renderItems();
+        };
+    }
+
+    function renderItems() {
+        const container = document.getElementById('items-container');
+        container.innerHTML = '';
+        const index = db.transaction("items").objectStore("items").index("listId");
+        index.getAll(IDBKeyRange.only(currentListId)).onsuccess = (e) => {
+            e.target.result.forEach(item => {
+                container.innerHTML += `
+                    <div class="row ${item.bought ? 'bought' : ''}" onclick="toggleItem(${item.id}, ${item.bought})">
+                        <span>${item.name}</span>
+                        <button class="btn-del" onclick="deleteItem(event, ${item.id})">✕</button>
+                    </div>`;
+            });
+        };
+    }
+
+    function toggleItem(id, currentStatus) {
+        const store = db.transaction(["items"], "readwrite").objectStore("items");
+        store.get(id).onsuccess = (e) => {
+            const data = e.target.result;
+            data.bought = !currentStatus;
+            store.put(data).onsuccess = renderItems;
+        };
+    }
+
+    function deleteItem(e, id) {
+        e.stopPropagation();
+        db.transaction(["items"], "readwrite").objectStore("items").delete(id).onsuccess = renderItems;
+    }
+</script>
+
 </body>
 </html>
