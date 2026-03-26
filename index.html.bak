@@ -39,26 +39,29 @@
         }
 
         header h1 { font-size: 34px; margin: 0; font-weight: 700; letter-spacing: -1px; }
-        header h2 { font-size: 17px; margin: 0; font-weight: 600; text-align: center; flex: 1; }
+        header h2 { font-size: 17px; margin: 0; font-weight: 600; text-align: center; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         .container { padding: 16px; }
 
         .input-row {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             margin-bottom: 24px;
         }
 
         input {
-            flex: 1;
             background: #E3E3E8;
             border: none;
             padding: 12px 16px;
             border-radius: 12px;
             font-size: 17px;
             outline: none;
+            -webkit-appearance: none;
         }
+
+        #new-list-name, #new-item-name { flex: 3; }
+        #new-item-qty { flex: 1; width: 60px; text-align: center; }
 
         .btn-circle {
             width: 32px; height: 32px;
@@ -66,6 +69,7 @@
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             border: none; color: white; font-size: 24px; font-weight: 300;
+            flex-shrink: 0;
         }
 
         .btn-back {
@@ -73,9 +77,9 @@
             font-size: 17px;
             background: none; border: none;
             display: flex; align-items: center; padding: 0;
+            cursor: pointer;
         }
 
-        /* Таблица со свайпами */
         .table-view {
             background: var(--ios-card);
             border-radius: 12px;
@@ -85,7 +89,7 @@
 
         .row-wrapper {
             position: relative;
-            background-color: var(--ios-red); /* Подложка для удаления */
+            background-color: var(--ios-red);
             border-bottom: 0.5px solid var(--ios-separator);
         }
 
@@ -94,6 +98,7 @@
         .table-row {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             padding: 14px 16px;
             background: var(--ios-card);
             position: relative;
@@ -116,12 +121,14 @@
         .action-edit { background-color: var(--ios-blue); }
         .action-delete { background-color: var(--ios-red); }
 
-        .list-name { font-weight: 700; font-size: 17px; display: block; }
-        .list-date { font-size: 13px; color: #8E8E93; }
-        .item-text { font-size: 17px; flex: 1; }
+        .list-name { font-weight: 700; font-size: 20px; letter-spacing: -0.5px; display: block; }
+        .list-date { font-size: 13px; color: #8E8E93; margin-top: 2px; }
+        
+        .item-text { font-size: 17px; flex: 1; text-align: left; }
+        .item-qty { font-size: 17px; color: #8E8E93; margin-left: 10px; text-align: right; }
 
         .bought { background-color: #F2F2F7 !important; }
-        .bought .item-text { text-decoration: line-through; color: #8E8E93; }
+        .bought .item-text, .bought .item-qty { text-decoration: line-through; color: #8E8E93; }
 
         .hidden { display: none; }
     </style>
@@ -135,7 +142,7 @@
     </header>
     <div class="container">
         <div class="input-row">
-            <input type="text" id="new-list-name" placeholder="Новый список">
+            <input type="text" id="new-list-name" placeholder="Новый список" enterkeyhint="done">
             <button class="btn-circle" onclick="newList()">+</button>
         </div>
         <div id="lists-container" class="table-view"></div>
@@ -150,7 +157,8 @@
     </header>
     <div class="container">
         <div class="input-row">
-            <input type="text" id="new-item-name" placeholder="Название товара">
+            <input type="text" id="new-item-name" placeholder="Товар" enterkeyhint="next">
+            <input type="text" id="new-item-qty" placeholder="Кол-во" enterkeyhint="done">
             <button class="btn-circle" onclick="addItem()">+</button>
         </div>
         <div id="items-container" class="table-view"></div>
@@ -163,8 +171,8 @@
     let startX = 0;
     let activeRow = null;
 
-    // Инициализация БД
-    const request = indexedDB.open("ShoppingDB", 2);
+    // Инициализация базы данных
+    const request = indexedDB.open("ShoppingDB", 3);
     request.onupgradeneeded = (e) => {
         db = e.target.result;
         if (!db.objectStoreNames.contains("lists")) db.createObjectStore("lists", { keyPath: "id", autoIncrement: true });
@@ -172,27 +180,22 @@
     };
     request.onsuccess = (e) => { db = e.target.result; renderLists(); };
 
-    // Функции вибрации (Haptic)
-    function hapticFeedback() {
-        if (navigator.vibrate) navigator.vibrate(15);
-    }
+    function hapticFeedback() { if (navigator.vibrate) navigator.vibrate(15); }
 
-    // Логика свайпа
+    // Логика свайпа iOS
     function tStart(e) {
-        startX = e.touches[0].clientX;
+        startX = e.touches.clientX;
         if (activeRow && activeRow !== e.currentTarget) closeSwipe();
     }
-
     function tMove(e) {
-        let diff = startX - e.touches[0].clientX;
-        if (diff > 0 && diff < 180) {
+        let diff = startX - e.touches.clientX;
+        if (diff > 0 && diff < 185) {
             e.currentTarget.style.transform = `translateX(-${diff}px)`;
             e.currentTarget.style.transition = 'none';
         }
     }
-
     function tEnd(e) {
-        let diff = startX - e.changedTouches[0].clientX;
+        let diff = startX - e.changedTouches.clientX;
         let row = e.currentTarget;
         row.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
         if (diff > 100) {
@@ -203,7 +206,6 @@
             activeRow = null;
         }
     }
-
     function closeSwipe() {
         if (activeRow) {
             activeRow.style.transform = `translateX(0)`;
@@ -211,7 +213,7 @@
         }
     }
 
-    // Рендер Списков
+    // Рендеринг списков на главной
     function renderLists() {
         const container = document.getElementById('lists-container');
         container.innerHTML = '';
@@ -235,7 +237,7 @@
         };
     }
 
-    // Рендер Товаров
+    // Рендеринг товаров в выбранном списке
     function renderItems() {
         const container = document.getElementById('items-container');
         container.innerHTML = '';
@@ -246,36 +248,46 @@
                 div.className = 'row-wrapper';
                 div.innerHTML = `
                     <div class="swipe-actions">
-                        <button class="action-btn action-edit" onclick="editItem(${item.id},'${item.name}')">Имя</button>
+                        <button class="action-btn action-edit" onclick="editItem(${item.id},'${item.name}','${item.qty||''}')">Правка</button>
                         <button class="action-btn action-delete" onclick="deleteItem(${item.id})">Удалить</button>
                     </div>
                     <div class="table-row ${item.bought ? 'bought' : ''}" ontouchstart="tStart(event)" ontouchmove="tMove(event)" ontouchend="tEnd(event)" onclick="if(!activeRow) toggleItem(${item.id}, ${item.bought})">
                         <span class="item-text">${item.name}</span>
+                        <span class="item-qty">${item.qty || ''}</span>
                     </div>`;
                 container.appendChild(div);
             });
         };
     }
 
-    // Логика БД
+    // Обработка клавиши Enter (автофокус и быстрый ввод)
+    document.getElementById('new-list-name').addEventListener('keypress', (e) => { if (e.key === 'Enter') newList(); });
+    document.getElementById('new-item-name').addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
+    document.getElementById('new-item-qty').addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
+
     function newList() {
         const input = document.getElementById('new-list-name');
         if (!input.value) return;
         const transaction = db.transaction(["lists"], "readwrite");
         transaction.objectStore("lists").add({ name: input.value, date: new Date().toLocaleDateString('ru-RU') });
-        transaction.oncomplete = () => { input.value = ''; renderLists(); hapticFeedback(); };
+        transaction.oncomplete = () => { 
+            input.value = ''; renderLists(); hapticFeedback(); input.focus();
+        };
     }
 
     function addItem() {
-        const input = document.getElementById('new-item-name');
-        if (!input.value) return;
+        const nameInput = document.getElementById('new-item-name');
+        const qtyInput = document.getElementById('new-item-qty');
+        if (!nameInput.value) return;
         const transaction = db.transaction(["items"], "readwrite");
-        transaction.objectStore("items").add({ listId: currentListId, name: input.value, bought: false });
-        transaction.oncomplete = () => { input.value = ''; renderItems(); hapticFeedback(); };
+        transaction.objectStore("items").add({ listId: currentListId, name: nameInput.value, qty: qtyInput.value, bought: false });
+        transaction.oncomplete = () => { 
+            nameInput.value = ''; qtyInput.value = ''; renderItems(); hapticFeedback(); nameInput.focus();
+        };
     }
 
     function toggleItem(id, status) {
-        hapticFeedback(); // Вибрация при отметке
+        hapticFeedback();
         const store = db.transaction(["items"], "readwrite").objectStore("items");
         store.get(id).onsuccess = (e) => {
             const data = e.target.result;
@@ -296,15 +308,15 @@
         closeSwipe();
     }
 
-    function editItem(id, old) {
-        const name = prompt("Название товара:", old);
-        if (name) {
-            const store = db.transaction(["items"], "readwrite").objectStore("items");
-            store.get(id).onsuccess = (e) => {
-                let d = e.target.result; d.name = name;
-                store.put(d).onsuccess = renderItems;
-            };
-        }
+    function editItem(id, oldName, oldQty) {
+        const name = prompt("Название товара:", oldName);
+        if (name === null) { closeSwipe(); return; }
+        const qty = prompt("Количество:", oldQty);
+        const store = db.transaction(["items"], "readwrite").objectStore("items");
+        store.get(id).onsuccess = (e) => {
+            let d = e.target.result; d.name = name; d.qty = qty;
+            store.put(d).onsuccess = renderItems;
+        };
         closeSwipe();
     }
 
@@ -324,6 +336,7 @@
         document.getElementById('view-main').classList.add('hidden');
         document.getElementById('view-items').classList.remove('hidden');
         renderItems();
+        setTimeout(() => { document.getElementById('new-item-name').focus(); }, 300);
     }
 
     function showMain() {

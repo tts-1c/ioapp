@@ -32,14 +32,14 @@
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             padding: 50px 16px 12px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
             border-bottom: 0.5px solid var(--ios-separator);
         }
 
         header h1 { font-size: 34px; margin: 0; font-weight: 700; letter-spacing: -1px; }
-        header h2 { font-size: 17px; margin: 0; font-weight: 600; text-align: center; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        /* Заголовок внутри списка — теперь большой и жирный */
+        .title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+        .inner-title { font-size: 30px; font-weight: 700; letter-spacing: -0.5px; margin: 0; flex: 1; }
 
         .container { padding: 16px; }
 
@@ -57,7 +57,6 @@
             border-radius: 12px;
             font-size: 17px;
             outline: none;
-            -webkit-appearance: none;
         }
 
         #new-list-name, #new-item-name { flex: 3; }
@@ -77,7 +76,7 @@
             font-size: 17px;
             background: none; border: none;
             display: flex; align-items: center; padding: 0;
-            cursor: pointer;
+            margin-bottom: 10px;
         }
 
         .table-view {
@@ -91,6 +90,7 @@
             position: relative;
             background-color: var(--ios-red);
             border-bottom: 0.5px solid var(--ios-separator);
+            overflow: hidden;
         }
 
         .row-wrapper:last-child { border-bottom: none; }
@@ -103,7 +103,7 @@
             background: var(--ios-card);
             position: relative;
             z-index: 2;
-            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: transform 0.3s ease-out;
         }
 
         .swipe-actions {
@@ -121,11 +121,11 @@
         .action-edit { background-color: var(--ios-blue); }
         .action-delete { background-color: var(--ios-red); }
 
-        .list-name { font-weight: 700; font-size: 20px; letter-spacing: -0.5px; display: block; }
+        .list-name { font-weight: 700; font-size: 20px; letter-spacing: -0.5px; }
         .list-date { font-size: 13px; color: #8E8E93; margin-top: 2px; }
         
         .item-text { font-size: 17px; flex: 1; text-align: left; }
-        .item-qty { font-size: 17px; color: #8E8E93; margin-left: 10px; text-align: right; }
+        .item-qty { font-size: 17px; color: #8E8E93; margin-left: 10px; }
 
         .bought { background-color: #F2F2F7 !important; }
         .bought .item-text, .bought .item-qty { text-decoration: line-through; color: #8E8E93; }
@@ -135,30 +135,28 @@
 </head>
 <body>
 
-<!-- ГЛАВНЫЙ ЭКРАН -->
 <div id="view-main">
-    <header>
-        <h1>Списки</h1>
-    </header>
+    <header><h1>Списки</h1></header>
     <div class="container">
         <div class="input-row">
-            <input type="text" id="new-list-name" placeholder="Новый список" enterkeyhint="done">
+            <input type="text" id="new-list-name" placeholder="Новый список">
             <button class="btn-circle" onclick="newList()">+</button>
         </div>
         <div id="lists-container" class="table-view"></div>
     </div>
 </div>
 
-<!-- ЭКРАН ТОВАРОВ -->
 <div id="view-items" class="hidden">
-    <header style="justify-content: flex-start; gap: 10px;">
-        <button class="btn-back" onclick="showMain()"><span style="font-size: 28px;">‹</span>Назад</button>
-        <h2 id="current-list-title"></h2>
+    <header>
+        <button class="btn-back" onclick="showMain()">‹ Назад</button>
+        <div class="title-row">
+            <h1 id="current-list-title" class="inner-title"></h1>
+        </div>
     </header>
     <div class="container">
         <div class="input-row">
-            <input type="text" id="new-item-name" placeholder="Товар" enterkeyhint="next">
-            <input type="text" id="new-item-qty" placeholder="Кол-во" enterkeyhint="done">
+            <input type="text" id="new-item-name" placeholder="Товар">
+            <input type="text" id="new-item-qty" placeholder="Кол-во">
             <button class="btn-circle" onclick="addItem()">+</button>
         </div>
         <div id="items-container" class="table-view"></div>
@@ -166,12 +164,8 @@
 </div>
 
 <script>
-    let db;
-    let currentListId = null;
-    let startX = 0;
-    let activeRow = null;
+    let db, currentListId = null, startX = 0, activeRow = null;
 
-    // Инициализация базы данных
     const request = indexedDB.open("ShoppingDB", 3);
     request.onupgradeneeded = (e) => {
         db = e.target.result;
@@ -180,25 +174,27 @@
     };
     request.onsuccess = (e) => { db = e.target.result; renderLists(); };
 
-    function hapticFeedback() { if (navigator.vibrate) navigator.vibrate(15); }
+    function haptic() { if (navigator.vibrate) navigator.vibrate(15); }
 
-    // Логика свайпа iOS
+    // Логика свайпа (исправленная)
     function tStart(e) {
-        startX = e.touches.clientX;
+        startX = e.touches[0].clientX;
         if (activeRow && activeRow !== e.currentTarget) closeSwipe();
     }
+
     function tMove(e) {
-        let diff = startX - e.touches.clientX;
-        if (diff > 0 && diff < 185) {
+        let diff = startX - e.touches[0].clientX;
+        if (diff > 0 && diff < 200) {
             e.currentTarget.style.transform = `translateX(-${diff}px)`;
             e.currentTarget.style.transition = 'none';
         }
     }
+
     function tEnd(e) {
-        let diff = startX - e.changedTouches.clientX;
+        let diff = startX - e.changedTouches[0].clientX;
         let row = e.currentTarget;
-        row.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-        if (diff > 100) {
+        row.style.transition = 'transform 0.3s ease-out';
+        if (diff > 80) {
             row.style.transform = `translateX(-170px)`;
             activeRow = row;
         } else {
@@ -206,6 +202,7 @@
             activeRow = null;
         }
     }
+
     function closeSwipe() {
         if (activeRow) {
             activeRow.style.transform = `translateX(0)`;
@@ -213,7 +210,6 @@
         }
     }
 
-    // Рендеринг списков на главной
     function renderLists() {
         const container = document.getElementById('lists-container');
         container.innerHTML = '';
@@ -227,9 +223,9 @@
                         <button class="action-btn action-delete" onclick="deleteList(${list.id})">Удалить</button>
                     </div>
                     <div class="table-row" ontouchstart="tStart(event)" ontouchmove="tMove(event)" ontouchend="tEnd(event)" onclick="if(!activeRow) showItems(${list.id}, '${list.name}')">
-                        <div class="list-info">
+                        <div>
                             <span class="list-name">${list.name}</span>
-                            <span class="list-date">${list.date}</span>
+                            <div class="list-date">${list.date}</div>
                         </div>
                     </div>`;
                 container.appendChild(div);
@@ -237,7 +233,6 @@
         };
     }
 
-    // Рендеринг товаров в выбранном списке
     function renderItems() {
         const container = document.getElementById('items-container');
         container.innerHTML = '';
@@ -260,19 +255,16 @@
         };
     }
 
-    // Обработка клавиши Enter (автофокус и быстрый ввод)
-    document.getElementById('new-list-name').addEventListener('keypress', (e) => { if (e.key === 'Enter') newList(); });
-    document.getElementById('new-item-name').addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
-    document.getElementById('new-item-qty').addEventListener('keypress', (e) => { if (e.key === 'Enter') addItem(); });
+    document.getElementById('new-list-name').onkeypress = (e) => { if (e.key === 'Enter') newList(); };
+    document.getElementById('new-item-name').onkeypress = (e) => { if (e.key === 'Enter') addItem(); };
+    document.getElementById('new-item-qty').onkeypress = (e) => { if (e.key === 'Enter') addItem(); };
 
     function newList() {
         const input = document.getElementById('new-list-name');
         if (!input.value) return;
         const transaction = db.transaction(["lists"], "readwrite");
         transaction.objectStore("lists").add({ name: input.value, date: new Date().toLocaleDateString('ru-RU') });
-        transaction.oncomplete = () => { 
-            input.value = ''; renderLists(); hapticFeedback(); input.focus();
-        };
+        transaction.oncomplete = () => { input.value = ''; renderLists(); haptic(); input.focus(); };
     }
 
     function addItem() {
@@ -281,13 +273,11 @@
         if (!nameInput.value) return;
         const transaction = db.transaction(["items"], "readwrite");
         transaction.objectStore("items").add({ listId: currentListId, name: nameInput.value, qty: qtyInput.value, bought: false });
-        transaction.oncomplete = () => { 
-            nameInput.value = ''; qtyInput.value = ''; renderItems(); hapticFeedback(); nameInput.focus();
-        };
+        transaction.oncomplete = () => { nameInput.value = ''; qtyInput.value = ''; renderItems(); haptic(); nameInput.focus(); };
     }
 
     function toggleItem(id, status) {
-        hapticFeedback();
+        haptic();
         const store = db.transaction(["items"], "readwrite").objectStore("items");
         store.get(id).onsuccess = (e) => {
             const data = e.target.result;
@@ -297,7 +287,7 @@
     }
 
     function editList(id, old) {
-        const name = prompt("Название списка:", old);
+        const name = prompt("Название:", old);
         if (name) {
             const store = db.transaction(["lists"], "readwrite").objectStore("lists");
             store.get(id).onsuccess = (e) => {
@@ -308,10 +298,10 @@
         closeSwipe();
     }
 
-    function editItem(id, oldName, oldQty) {
-        const name = prompt("Название товара:", oldName);
-        if (name === null) { closeSwipe(); return; }
-        const qty = prompt("Количество:", oldQty);
+    function editItem(id, n, q) {
+        const name = prompt("Товар:", n);
+        if (name === null) return closeSwipe();
+        const qty = prompt("Кол-во:", q);
         const store = db.transaction(["items"], "readwrite").objectStore("items");
         store.get(id).onsuccess = (e) => {
             let d = e.target.result; d.name = name; d.qty = qty;
@@ -322,12 +312,12 @@
 
     function deleteList(id) {
         db.transaction(["lists", "items"], "readwrite").objectStore("lists").delete(id);
-        renderLists(); activeRow = null; hapticFeedback();
+        renderLists(); activeRow = null; haptic();
     }
 
     function deleteItem(id) {
         db.transaction(["items"], "readwrite").objectStore("items").delete(id).onsuccess = renderItems;
-        activeRow = null; hapticFeedback();
+        activeRow = null; haptic();
     }
 
     function showItems(id, name) {
@@ -336,7 +326,7 @@
         document.getElementById('view-main').classList.add('hidden');
         document.getElementById('view-items').classList.remove('hidden');
         renderItems();
-        setTimeout(() => { document.getElementById('new-item-name').focus(); }, 300);
+        setTimeout(() => document.getElementById('new-item-name').focus(), 350);
     }
 
     function showMain() {
