@@ -22,7 +22,7 @@
             color: #000;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
-            overflow-x: hidden; /* Запрет горизонтальной прокрутки всей страницы */
+            overflow-x: hidden;
         }
 
         header {
@@ -89,7 +89,7 @@
             background-color: var(--ios-red);
             border-bottom: 0.5px solid var(--ios-separator);
             overflow: hidden;
-            touch-action: pan-y; /* Разрешаем только вертикальный скролл */
+            touch-action: pan-y;
         }
 
         .row-wrapper:last-child { border-bottom: none; }
@@ -163,6 +163,7 @@
 
 <script>
     let db, currentListId = null, startX = 0, startY = 0, activeRow = null, isSwiping = false;
+    let initialOffset = 0; // Состояние смещения в начале касания
 
     const request = indexedDB.open("ShoppingDB", 3);
     request.onupgradeneeded = (e) => {
@@ -174,40 +175,57 @@
 
     function haptic() { if (navigator.vibrate) navigator.vibrate(15); }
 
-    // Улучшенная логика свайпа с блокировкой страницы
     function tStart(e) {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
+        startX = e.touches.clientX;
+        startY = e.touches.clientY;
         isSwiping = false;
+        
+        // Получаем текущее смещение (открыто меню или нет)
+        const style = window.getComputedStyle(e.currentTarget);
+        const matrix = new WebKitCSSMatrix(style.transform);
+        initialOffset = matrix.m41;
+
         if (activeRow && activeRow !== e.currentTarget) closeSwipe();
     }
 
     function tMove(e) {
-        let diffX = startX - e.touches[0].clientX;
-        let diffY = Math.abs(startY - e.touches[0].clientY);
+        let currentX = e.touches.clientX;
+        let diffX = startX - currentX;
+        let diffY = Math.abs(startY - e.touches.clientY);
 
-        // Если движение больше горизонтальное, чем вертикальное
-        if (diffX > 5 && diffX > diffY) {
+        // Блокируем скролл страницы только если жест явно горизонтальный
+        if (Math.abs(diffX) > 5 && Math.abs(diffX) > diffY) {
             isSwiping = true;
-            if (e.cancelable) e.preventDefault(); // Блокируем сдвиг всей страницы
+            if (e.cancelable) e.preventDefault();
             e.stopPropagation();
-            
-            let move = Math.min(diffX, 200);
-            e.currentTarget.style.transform = `translateX(-${move}px)`;
+
+            let targetMove = initialOffset - diffX;
+
+            // Ограничиваем движение: не даем уйти вправо больше 0
+            if (targetMove > 0) targetMove = targetMove / 3; // "Резиновый" эффект
+            // Ограничиваем свайп влево (макс 200px)
+            if (targetMove < -200) targetMove = -200;
+
+            e.currentTarget.style.transform = `translateX(${targetMove}px)`;
             e.currentTarget.style.transition = 'none';
         }
     }
 
     function tEnd(e) {
         if (!isSwiping) return;
-        let diff = startX - e.changedTouches[0].clientX;
         let row = e.currentTarget;
+        const style = window.getComputedStyle(row);
+        const matrix = new WebKitCSSMatrix(style.transform);
+        let finalOffset = matrix.m41;
+
         row.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
         
-        if (diff > 80) {
+        // Если свайпнули влево достаточно сильно (-80px)
+        if (finalOffset < -80) {
             row.style.transform = `translateX(-170px)`;
             activeRow = row;
         } else {
+            // Если свайпнули вправо или недостаточно влево — закрываем
             row.style.transform = `translateX(0)`;
             activeRow = null;
         }
@@ -219,6 +237,8 @@
             activeRow = null;
         }
     }
+
+    // --- Логика рендеринга и БД (без изменений) ---
 
     function renderLists() {
         const container = document.getElementById('lists-container');
@@ -233,10 +253,7 @@
                         <button class="action-btn action-delete" onclick="deleteList(${list.id})">Удалить</button>
                     </div>
                     <div class="table-row" ontouchstart="tStart(event)" ontouchmove="tMove(event)" ontouchend="tEnd(event)" onclick="if(!activeRow) showItems(${list.id}, '${list.name}')">
-                        <div>
-                            <span class="list-name">${list.name}</span>
-                            <div class="list-date">${list.date}</div>
-                        </div>
+                        <div><span class="list-name">${list.name}</span><div class="list-date">${list.date}</div></div>
                     </div>`;
                 container.appendChild(div);
             });
@@ -265,7 +282,6 @@
         };
     }
 
-    // Enter handlers
     document.getElementById('new-list-name').onkeypress = (e) => { if (e.key === 'Enter') newList(); };
     document.getElementById('new-item-name').onkeypress = (e) => { if (e.key === 'Enter') addItem(); };
     document.getElementById('new-item-qty').onkeypress = (e) => { if (e.key === 'Enter') addItem(); };
