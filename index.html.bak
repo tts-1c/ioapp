@@ -3,62 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Списки покупок</title>
-    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Покупки</title>
     <style>
-        :root { --ios-blue: #007AFF; --ios-gray: #F2F2F7; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; background: var(--ios-gray); }
-        header { background: #fff; padding: 40px 20px 10px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center; }
-        .container { padding: 10px; }
-        
-        /* Таблицы / Списки */
-        .card { background: #fff; border-radius: 10px; overflow: hidden; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .row { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; }
-        .row:last-child { border-bottom: none; }
-        .row:active { background: #e5e5ea; }
-        
-        /* Индикация "в корзине" */
-        .bought { background-color: #d1ffd1 !important; text-decoration: line-through; color: #888; }
-        
-        /* Кнопки и формы */
-        .btn { color: var(--ios-blue); font-size: 17px; background: none; border: none; cursor: pointer; }
-        .btn-del { color: #ff3b30; font-size: 14px; }
-        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
-        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
-        
+        :root {
+            --ios-blue: #007AFF;
+            --ios-red: #FF3B30;
+            --ios-bg: #F2F2F7;
+            --ios-card: #FFFFFF;
+            --ios-separator: #C6C6C8;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--ios-bg);
+            margin: 0;
+            padding: 0;
+            color: #000;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Навигация как в iOS */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            padding: 50px 16px 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 0.5px solid var(--ios-separator);
+        }
+
+        header h1 { font-size: 34px; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
+        header h2 { font-size: 17px; margin: 0; font-weight: 600; text-align: center; flex: 1; }
+
+        .container { padding: 16px; padding-bottom: 100px; }
+
+        /* Поля ввода и кнопки в ряд */
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            flex: 1;
+            background: #E3E3E8;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 12px;
+            font-size: 17px;
+            outline: none;
+        }
+
+        /* Круглые кнопки iOS (+) */
+        .btn-circle {
+            width: 32px;
+            height: 32px;
+            background-color: var(--ios-blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            color: white;
+            font-size: 22px;
+            font-weight: 300;
+            flex-shrink: 0;
+        }
+
+        .btn-back {
+            color: var(--ios-blue);
+            font-size: 17px;
+            background: none;
+            border: none;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        /* Стили таблиц (Inset Grouped) */
+        .table-view {
+            background: var(--ios-card);
+            border-radius: 10px;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .table-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 0.5px solid var(--ios-separator);
+            min-height: 44px;
+        }
+
+        .table-row:last-child { border-bottom: none; }
+        .table-row:active { background-color: #D1D1D6; }
+
+        .list-info { display: flex; flex-direction: column; }
+        .list-name { font-weight: 600; font-size: 17px; }
+        .list-date { font-size: 13px; color: #8E8E93; margin-top: 2px; }
+
+        /* Состояние "в корзине" */
+        .bought { background-color: #E8F5E9 !important; }
+        .bought .item-text { text-decoration: line-through; color: #8E8E93; }
+
+        /* Кнопка удаления (значок в круге) */
+        .btn-remove {
+            width: 24px;
+            height: 24px;
+            background-color: var(--ios-red);
+            color: white;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
         .hidden { display: none; }
-        .date-text { font-size: 12px; color: #8e8e93; }
     </style>
 </head>
 <body>
 
+<!-- ГЛАВНЫЙ ЭКРАН -->
 <div id="view-main">
     <header>
         <h1>Списки</h1>
-        <button class="btn" onclick="newList()">+</button>
     </header>
     <div class="container">
-        <div class="input-group">
-            <input type="text" id="new-list-name" placeholder="Название (напр. Продукты)">
+        <div class="input-row">
+            <input type="text" id="new-list-name" placeholder="Новый список">
+            <button class="btn-circle" onclick="newList()">+</button>
         </div>
-        <div id="lists-container" class="card"></div>
+        <div id="lists-container" class="table-view"></div>
     </div>
 </div>
 
+<!-- ЭКРАН ТОВАРОВ -->
 <div id="view-items" class="hidden">
-    <header>
-        <button class="btn" onclick="showMain()">< Назад</button>
-        <h1 id="current-list-title">Товары</h1>
-        <span></span>
+    <header style="padding-top: 50px; justify-content: flex-start; gap: 20px;">
+        <button class="btn-back" onclick="showMain()">
+            <span style="font-size: 24px; margin-right: 5px;">‹</span> Назад
+        </button>
+        <h2 id="current-list-title">Загрузка...</h2>
     </header>
     <div class="container">
-        <div class="input-group">
-            <input type="text" id="new-item-name" placeholder="Что купить?">
-            <button class="btn" onclick="addItem()">Добавить</button>
+        <div class="input-row">
+            <input type="text" id="new-item-name" placeholder="Название товара">
+            <button class="btn-circle" onclick="addItem()">+</button>
         </div>
-        <div id="items-container" class="card"></div>
+        <div id="items-container" class="table-view"></div>
     </div>
 </div>
 
@@ -66,25 +174,20 @@
     let db;
     let currentListId = null;
 
-    // 1. Инициализация БД
-    const request = indexedDB.open("ShoppingDB", 1);
+    const request = indexedDB.open("ShoppingDB", 2);
     request.onupgradeneeded = (e) => {
         db = e.target.result;
-        db.createObjectStore("lists", { keyPath: "id", autoIncrement: true });
-        db.createObjectStore("items", { keyPath: "id", autoIncrement: true }).createIndex("listId", "listId");
+        if (!db.objectStoreNames.contains("lists")) db.createObjectStore("lists", { keyPath: "id", autoIncrement: true });
+        if (!db.objectStoreNames.contains("items")) db.createObjectStore("items", { keyPath: "id", autoIncrement: true }).createIndex("listId", "listId");
     };
     request.onsuccess = (e) => { db = e.target.result; renderLists(); };
 
-    // 2. Работа со списками
     function newList() {
-        const name = document.getElementById('new-list-name').value;
-        if (!name) return;
+        const input = document.getElementById('new-list-name');
+        if (!input.value) return;
         const transaction = db.transaction(["lists"], "readwrite");
-        transaction.objectStore("lists").add({ name: name, date: new Date().toLocaleDateString() });
-        transaction.oncomplete = () => {
-            document.getElementById('new-list-name').value = '';
-            renderLists();
-        };
+        transaction.objectStore("lists").add({ name: input.value, date: new Date().toLocaleDateString('ru-RU') });
+        transaction.oncomplete = () => { input.value = ''; renderLists(); };
     }
 
     function renderLists() {
@@ -93,12 +196,12 @@
         db.transaction("lists").objectStore("lists").getAll().onsuccess = (e) => {
             e.target.result.forEach(list => {
                 container.innerHTML += `
-                    <div class="row" onclick="showItems(${list.id}, '${list.name}')">
-                        <div>
-                            <div>${list.name}</div>
-                            <div class="date-text">${list.date}</div>
+                    <div class="table-row" onclick="showItems(${list.id}, '${list.name}')">
+                        <div class="list-info">
+                            <span class="list-name">${list.name}</span>
+                            <span class="list-date">${list.date}</span>
                         </div>
-                        <button class="btn-del" onclick="deleteList(event, ${list.id})">Удалить</button>
+                        <button class="btn-remove" onclick="deleteList(event, ${list.id})">−</button>
                     </div>`;
             });
         };
@@ -106,11 +209,10 @@
 
     function deleteList(e, id) {
         e.stopPropagation();
-        db.transaction(["lists"], "readwrite").objectStore("lists").delete(id);
+        db.transaction(["lists", "items"], "readwrite").objectStore("lists").delete(id);
         renderLists();
     }
 
-    // 3. Работа с товарами внутри списка
     function showItems(id, name) {
         currentListId = id;
         document.getElementById('current-list-title').innerText = name;
@@ -126,14 +228,11 @@
     }
 
     function addItem() {
-        const name = document.getElementById('new-item-name').value;
-        if (!name) return;
+        const input = document.getElementById('new-item-name');
+        if (!input.value) return;
         const transaction = db.transaction(["items"], "readwrite");
-        transaction.objectStore("items").add({ listId: currentListId, name: name, bought: false });
-        transaction.oncomplete = () => {
-            document.getElementById('new-item-name').value = '';
-            renderItems();
-        };
+        transaction.objectStore("items").add({ listId: currentListId, name: input.value, bought: false });
+        transaction.oncomplete = () => { input.value = ''; renderItems(); };
     }
 
     function renderItems() {
@@ -143,19 +242,19 @@
         index.getAll(IDBKeyRange.only(currentListId)).onsuccess = (e) => {
             e.target.result.forEach(item => {
                 container.innerHTML += `
-                    <div class="row ${item.bought ? 'bought' : ''}" onclick="toggleItem(${item.id}, ${item.bought})">
-                        <span>${item.name}</span>
-                        <button class="btn-del" onclick="deleteItem(event, ${item.id})">✕</button>
+                    <div class="table-row ${item.bought ? 'bought' : ''}" onclick="toggleItem(${item.id}, ${item.bought})">
+                        <span class="item-text">${item.name}</span>
+                        <button class="btn-remove" onclick="deleteItem(event, ${item.id})">✕</button>
                     </div>`;
             });
         };
     }
 
-    function toggleItem(id, currentStatus) {
+    function toggleItem(id, status) {
         const store = db.transaction(["items"], "readwrite").objectStore("items");
         store.get(id).onsuccess = (e) => {
             const data = e.target.result;
-            data.bought = !currentStatus;
+            data.bought = !status;
             store.put(data).onsuccess = renderItems;
         };
     }

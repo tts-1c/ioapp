@@ -16,123 +16,112 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: var(--ios-bg);
             margin: 0;
-            padding: 0;
             color: #000;
             -webkit-tap-highlight-color: transparent;
+            user-select: none;
         }
 
-        /* Навигация как в iOS */
         header {
             position: sticky;
             top: 0;
             z-index: 100;
             background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            padding: 50px 16px 10px 16px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 50px 16px 12px 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             border-bottom: 0.5px solid var(--ios-separator);
         }
 
-        header h1 { font-size: 34px; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
+        header h1 { font-size: 34px; margin: 0; font-weight: 700; letter-spacing: -1px; }
         header h2 { font-size: 17px; margin: 0; font-weight: 600; text-align: center; flex: 1; }
 
-        .container { padding: 16px; padding-bottom: 100px; }
+        .container { padding: 16px; }
 
-        /* Поля ввода и кнопки в ряд */
         .input-row {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 12px;
+            margin-bottom: 24px;
         }
 
         input {
             flex: 1;
             background: #E3E3E8;
             border: none;
-            padding: 12px 15px;
+            padding: 12px 16px;
             border-radius: 12px;
             font-size: 17px;
             outline: none;
         }
 
-        /* Круглые кнопки iOS (+) */
         .btn-circle {
-            width: 32px;
-            height: 32px;
+            width: 32px; height: 32px;
             background-color: var(--ios-blue);
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: none;
-            cursor: pointer;
-            color: white;
-            font-size: 22px;
-            font-weight: 300;
-            flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            border: none; color: white; font-size: 24px; font-weight: 300;
         }
 
         .btn-back {
             color: var(--ios-blue);
             font-size: 17px;
-            background: none;
-            border: none;
-            padding: 0;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
+            background: none; border: none;
+            display: flex; align-items: center; padding: 0;
         }
 
-        /* Стили таблиц (Inset Grouped) */
+        /* Таблица со свайпами */
         .table-view {
             background: var(--ios-card);
-            border-radius: 10px;
-            list-style: none;
-            padding: 0;
-            margin: 0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 30px;
         }
+
+        .row-wrapper {
+            position: relative;
+            background-color: var(--ios-red); /* Подложка для удаления */
+            border-bottom: 0.5px solid var(--ios-separator);
+        }
+
+        .row-wrapper:last-child { border-bottom: none; }
 
         .table-row {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 12px 16px;
-            border-bottom: 0.5px solid var(--ios-separator);
-            min-height: 44px;
+            padding: 14px 16px;
+            background: var(--ios-card);
+            position: relative;
+            z-index: 2;
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
 
-        .table-row:last-child { border-bottom: none; }
-        .table-row:active { background-color: #D1D1D6; }
-
-        .list-info { display: flex; flex-direction: column; }
-        .list-name { font-weight: 600; font-size: 17px; }
-        .list-date { font-size: 13px; color: #8E8E93; margin-top: 2px; }
-
-        /* Состояние "в корзине" */
-        .bought { background-color: #E8F5E9 !important; }
-        .bought .item-text { text-decoration: line-through; color: #8E8E93; }
-
-        /* Кнопка удаления (значок в круге) */
-        .btn-remove {
-            width: 24px;
-            height: 24px;
-            background-color: var(--ios-red);
-            color: white;
-            border-radius: 50%;
-            border: none;
+        .swipe-actions {
+            position: absolute;
+            right: 0; top: 0; bottom: 0;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            font-weight: bold;
+            z-index: 1;
         }
+
+        .action-btn {
+            width: 85px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 600; font-size: 15px; border: none;
+        }
+        .action-edit { background-color: var(--ios-blue); }
+        .action-delete { background-color: var(--ios-red); }
+
+        .list-name { font-weight: 700; font-size: 17px; display: block; }
+        .list-date { font-size: 13px; color: #8E8E93; }
+        .item-text { font-size: 17px; flex: 1; }
+
+        .bought { background-color: #F2F2F7 !important; }
+        .bought .item-text { text-decoration: line-through; color: #8E8E93; }
 
         .hidden { display: none; }
     </style>
@@ -155,11 +144,9 @@
 
 <!-- ЭКРАН ТОВАРОВ -->
 <div id="view-items" class="hidden">
-    <header style="padding-top: 50px; justify-content: flex-start; gap: 20px;">
-        <button class="btn-back" onclick="showMain()">
-            <span style="font-size: 24px; margin-right: 5px;">‹</span> Назад
-        </button>
-        <h2 id="current-list-title">Загрузка...</h2>
+    <header style="justify-content: flex-start; gap: 10px;">
+        <button class="btn-back" onclick="showMain()"><span style="font-size: 28px;">‹</span>Назад</button>
+        <h2 id="current-list-title"></h2>
     </header>
     <div class="container">
         <div class="input-row">
@@ -173,7 +160,10 @@
 <script>
     let db;
     let currentListId = null;
+    let startX = 0;
+    let activeRow = null;
 
+    // Инициализация БД
     const request = indexedDB.open("ShoppingDB", 2);
     request.onupgradeneeded = (e) => {
         db = e.target.result;
@@ -182,35 +172,150 @@
     };
     request.onsuccess = (e) => { db = e.target.result; renderLists(); };
 
-    function newList() {
-        const input = document.getElementById('new-list-name');
-        if (!input.value) return;
-        const transaction = db.transaction(["lists"], "readwrite");
-        transaction.objectStore("lists").add({ name: input.value, date: new Date().toLocaleDateString('ru-RU') });
-        transaction.oncomplete = () => { input.value = ''; renderLists(); };
+    // Функции вибрации (Haptic)
+    function hapticFeedback() {
+        if (navigator.vibrate) navigator.vibrate(15);
     }
 
+    // Логика свайпа
+    function tStart(e) {
+        startX = e.touches[0].clientX;
+        if (activeRow && activeRow !== e.currentTarget) closeSwipe();
+    }
+
+    function tMove(e) {
+        let diff = startX - e.touches[0].clientX;
+        if (diff > 0 && diff < 180) {
+            e.currentTarget.style.transform = `translateX(-${diff}px)`;
+            e.currentTarget.style.transition = 'none';
+        }
+    }
+
+    function tEnd(e) {
+        let diff = startX - e.changedTouches[0].clientX;
+        let row = e.currentTarget;
+        row.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        if (diff > 100) {
+            row.style.transform = `translateX(-170px)`;
+            activeRow = row;
+        } else {
+            row.style.transform = `translateX(0)`;
+            activeRow = null;
+        }
+    }
+
+    function closeSwipe() {
+        if (activeRow) {
+            activeRow.style.transform = `translateX(0)`;
+            activeRow = null;
+        }
+    }
+
+    // Рендер Списков
     function renderLists() {
         const container = document.getElementById('lists-container');
         container.innerHTML = '';
         db.transaction("lists").objectStore("lists").getAll().onsuccess = (e) => {
             e.target.result.forEach(list => {
-                container.innerHTML += `
-                    <div class="table-row" onclick="showItems(${list.id}, '${list.name}')">
+                const div = document.createElement('div');
+                div.className = 'row-wrapper';
+                div.innerHTML = `
+                    <div class="swipe-actions">
+                        <button class="action-btn action-edit" onclick="editList(${list.id},'${list.name}')">Правка</button>
+                        <button class="action-btn action-delete" onclick="deleteList(${list.id})">Удалить</button>
+                    </div>
+                    <div class="table-row" ontouchstart="tStart(event)" ontouchmove="tMove(event)" ontouchend="tEnd(event)" onclick="if(!activeRow) showItems(${list.id}, '${list.name}')">
                         <div class="list-info">
                             <span class="list-name">${list.name}</span>
                             <span class="list-date">${list.date}</span>
                         </div>
-                        <button class="btn-remove" onclick="deleteList(event, ${list.id})">−</button>
                     </div>`;
+                container.appendChild(div);
             });
         };
     }
 
-    function deleteList(e, id) {
-        e.stopPropagation();
+    // Рендер Товаров
+    function renderItems() {
+        const container = document.getElementById('items-container');
+        container.innerHTML = '';
+        const index = db.transaction("items").objectStore("items").index("listId");
+        index.getAll(IDBKeyRange.only(currentListId)).onsuccess = (e) => {
+            e.target.result.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'row-wrapper';
+                div.innerHTML = `
+                    <div class="swipe-actions">
+                        <button class="action-btn action-edit" onclick="editItem(${item.id},'${item.name}')">Имя</button>
+                        <button class="action-btn action-delete" onclick="deleteItem(${item.id})">Удалить</button>
+                    </div>
+                    <div class="table-row ${item.bought ? 'bought' : ''}" ontouchstart="tStart(event)" ontouchmove="tMove(event)" ontouchend="tEnd(event)" onclick="if(!activeRow) toggleItem(${item.id}, ${item.bought})">
+                        <span class="item-text">${item.name}</span>
+                    </div>`;
+                container.appendChild(div);
+            });
+        };
+    }
+
+    // Логика БД
+    function newList() {
+        const input = document.getElementById('new-list-name');
+        if (!input.value) return;
+        const transaction = db.transaction(["lists"], "readwrite");
+        transaction.objectStore("lists").add({ name: input.value, date: new Date().toLocaleDateString('ru-RU') });
+        transaction.oncomplete = () => { input.value = ''; renderLists(); hapticFeedback(); };
+    }
+
+    function addItem() {
+        const input = document.getElementById('new-item-name');
+        if (!input.value) return;
+        const transaction = db.transaction(["items"], "readwrite");
+        transaction.objectStore("items").add({ listId: currentListId, name: input.value, bought: false });
+        transaction.oncomplete = () => { input.value = ''; renderItems(); hapticFeedback(); };
+    }
+
+    function toggleItem(id, status) {
+        hapticFeedback(); // Вибрация при отметке
+        const store = db.transaction(["items"], "readwrite").objectStore("items");
+        store.get(id).onsuccess = (e) => {
+            const data = e.target.result;
+            data.bought = !status;
+            store.put(data).onsuccess = renderItems;
+        };
+    }
+
+    function editList(id, old) {
+        const name = prompt("Название списка:", old);
+        if (name) {
+            const store = db.transaction(["lists"], "readwrite").objectStore("lists");
+            store.get(id).onsuccess = (e) => {
+                let d = e.target.result; d.name = name;
+                store.put(d).onsuccess = renderLists;
+            };
+        }
+        closeSwipe();
+    }
+
+    function editItem(id, old) {
+        const name = prompt("Название товара:", old);
+        if (name) {
+            const store = db.transaction(["items"], "readwrite").objectStore("items");
+            store.get(id).onsuccess = (e) => {
+                let d = e.target.result; d.name = name;
+                store.put(d).onsuccess = renderItems;
+            };
+        }
+        closeSwipe();
+    }
+
+    function deleteList(id) {
         db.transaction(["lists", "items"], "readwrite").objectStore("lists").delete(id);
-        renderLists();
+        renderLists(); activeRow = null; hapticFeedback();
+    }
+
+    function deleteItem(id) {
+        db.transaction(["items"], "readwrite").objectStore("items").delete(id).onsuccess = renderItems;
+        activeRow = null; hapticFeedback();
     }
 
     function showItems(id, name) {
@@ -226,44 +331,6 @@
         document.getElementById('view-items').classList.add('hidden');
         renderLists();
     }
-
-    function addItem() {
-        const input = document.getElementById('new-item-name');
-        if (!input.value) return;
-        const transaction = db.transaction(["items"], "readwrite");
-        transaction.objectStore("items").add({ listId: currentListId, name: input.value, bought: false });
-        transaction.oncomplete = () => { input.value = ''; renderItems(); };
-    }
-
-    function renderItems() {
-        const container = document.getElementById('items-container');
-        container.innerHTML = '';
-        const index = db.transaction("items").objectStore("items").index("listId");
-        index.getAll(IDBKeyRange.only(currentListId)).onsuccess = (e) => {
-            e.target.result.forEach(item => {
-                container.innerHTML += `
-                    <div class="table-row ${item.bought ? 'bought' : ''}" onclick="toggleItem(${item.id}, ${item.bought})">
-                        <span class="item-text">${item.name}</span>
-                        <button class="btn-remove" onclick="deleteItem(event, ${item.id})">✕</button>
-                    </div>`;
-            });
-        };
-    }
-
-    function toggleItem(id, status) {
-        const store = db.transaction(["items"], "readwrite").objectStore("items");
-        store.get(id).onsuccess = (e) => {
-            const data = e.target.result;
-            data.bought = !status;
-            store.put(data).onsuccess = renderItems;
-        };
-    }
-
-    function deleteItem(e, id) {
-        e.stopPropagation();
-        db.transaction(["items"], "readwrite").objectStore("items").delete(id).onsuccess = renderItems;
-    }
 </script>
-
 </body>
 </html>
